@@ -4,31 +4,52 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import javax.mail.Message;
+import javax.mail.MessagingException;
 import javax.mail.Session;
 import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
 
 /**
  * Simple templates for emails https://github.com/ugnich/TempleMail MIT License
  *
- * @version 1.0
+ * @version 1.1
  */
 public class TempleMail {
 
     private Session ss;
     private Transport tr;
     private MimeMessage msg;
+    private MimeMultipart multipart = null;
+    private MimeBodyPart htmlpart = null;
+
     private String template;
     private HashMap<String, String> replacevalues;
 
     public TempleMail() {
+        this(false);
+    }
+
+    public TempleMail(boolean isMultipart) {
         Properties props = new Properties();
         props.put("mail.host", "localhost");
         props.put("mail.transport.protocol", "smtp");
         ss = Session.getInstance(props, null);
 
         msg = new MimeMessage(ss);
+        if (isMultipart) {
+            try {
+                htmlpart = new MimeBodyPart();
+                multipart = new MimeMultipart();
+                multipart.addBodyPart(htmlpart);
+                msg.setContent(multipart);
+            } catch (MessagingException e) {
+                System.err.println("TempleMail.TempleMail: " + e.toString());
+            }
+        }
+
         replacevalues = new HashMap<String, String>();
     }
 
@@ -83,6 +104,16 @@ public class TempleMail {
         setHeader("List-Unsubscribe", "<" + url + ">");
     }
 
+    public void addBodyPart(MimeBodyPart bp) {
+        if (multipart != null) {
+            try {
+                multipart.addBodyPart(bp);
+            } catch (MessagingException e) {
+                System.err.println("TempleMail.addBodyPart: " + e.toString());
+            }
+        }
+    }
+
     public void setTemplate(String template) {
         this.template = template;
     }
@@ -114,7 +145,11 @@ public class TempleMail {
 
         boolean ret = false;
         try {
-            msg.setText(html, "utf-8", "html");
+            if (htmlpart != null) {
+                htmlpart.setText(html, "utf-8", "html");
+            } else {
+                msg.setText(html, "utf-8", "html");
+            }
             ret = true;
         } catch (Exception e) {
             System.err.println("TempleMail.compileMessage: " + e.toString());
